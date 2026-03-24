@@ -12,7 +12,7 @@ let bannedUsers = new Set();
 
 const mods = ["caaarlitos10", "demetriusdementor", "l73ale", "fatinho", "jordantubb"];
 
-const DISCORD_WEBHOOK_URL = "TU_WEBHOOK_AQUI";
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1486031073027686451/Np26uSuAfcFYEzPbiwMKxIoTuw99CqUaHlyK3NQNGjeAokqgrYtgwHdgb5Q48mEUmpFT";
 
 // ================= UTILS =================
 function normalize(name){
