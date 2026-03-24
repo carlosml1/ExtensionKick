@@ -90,26 +90,26 @@ function addMessage(msg){
   const div = document.createElement("div");
   div.dataset.id = msg.id;
 
-const icon = msg.isMod ? "🔨 " : "";
+  const icon = msg.isMod ? "🔨 " : "";
 
-div.innerHTML = `
-  <span style="color:${msg.isMod ? "#00ff99" : "#fff"}; font-weight:bold;">
-    ${icon} ${msg.username}
-  </span>: ${msg.text}
-`;
+  div.innerHTML = `${icon}<b>${msg.username}</b>: ${msg.text}`;
 
-  // botón borrar si es mod
-  if(msg.isMod && msg.userId === userId){
+  // 🔥 BOTÓN BORRAR (SOLO SI TÚ ERES MOD)
+  const myIsMod = msg.isMod && msg.username.toLowerCase() === username.toLowerCase();
+
+  if(myIsMod){
     const del = document.createElement("span");
     del.textContent = " 🗑";
     del.style.cursor = "pointer";
+
     del.onclick = ()=>{
       ws.send(JSON.stringify({
         type: "delete",
         messageId: msg.id,
-        userId
+        username // 🔥 IMPORTANTE (ya no usamos userId)
       }));
     };
+
     div.appendChild(del);
   }
 
