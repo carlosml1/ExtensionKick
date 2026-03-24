@@ -15,15 +15,15 @@ const mods = ["caaarlitos10", "demetriusdementor", "l73ale", "fatinho", "jordant
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1486031073027686451/Np26uSuAfcFYEzPbiwMKxIoTuw99CqUaHlyK3NQNGjeAokqgrYtgwHdgb5Q48mEUmpFT";
 
 // ================= UTILS =================
-function normalize(name){
+function normalize(name) {
   return name?.trim().toLowerCase();
 }
 
-function isUserMod(username){
+function isUserMod(username) {
   return mods.includes(normalize(username));
 }
 
-async function sendToDiscord(content){
+async function sendToDiscord(content) {
   try {
     await fetch(DISCORD_WEBHOOK_URL, {
       method: "POST",
@@ -35,11 +35,11 @@ async function sendToDiscord(content){
   }
 }
 
-function broadcastUsers(){
+function broadcastUsers() {
   const users = [];
 
   wss.clients.forEach(client => {
-    if(client.readyState === 1 && client.username){
+    if (client.readyState === 1 && client.username) {
       users.push(client.username);
     }
   });
@@ -47,7 +47,7 @@ function broadcastUsers(){
   const banned = Array.from(bannedUsers);
 
   wss.clients.forEach(client => {
-    if(client.readyState === 1){
+    if (client.readyState === 1) {
       client.send(JSON.stringify({
         type: "users",
         users,
@@ -69,37 +69,37 @@ wss.on("connection", (ws) => {
       const data = JSON.parse(msg);
 
       // ================= REGISTER =================
-      if(data.type === "register"){
-  const username = normalize(data.username);
+      if (data.type === "register") {
+        const username = normalize(data.username);
 
-  if(bannedUsers.has(username)){
-    ws.send(JSON.stringify({ type: "banned" }));
-    ws.close();
-    return;
-  }
+        if (bannedUsers.has(username)) {
+          ws.send(JSON.stringify({ type: "banned" }));
+          ws.close();
+          return;
+        }
 
-  // 🔥 IMPORTANTE
-  ws.username = username; // ← ESTA LÍNEA ES CLAVE
+        // 🔥 IMPORTANTE
+        ws.username = username; // ← ESTA LÍNEA ES CLAVE
 
-  currentUser = username;
+        currentUser = username;
 
-  ws.send(JSON.stringify({
-    type: "registered",
-    username
-  }));
+        ws.send(JSON.stringify({
+          type: "registered",
+          username
+        }));
 
-  // 🔥 MUY IMPORTANTE (después de asignar username)
-  broadcastUsers();
+        // 🔥 MUY IMPORTANTE (después de asignar username)
+        broadcastUsers();
 
-  ws.send(JSON.stringify({
-    type: "history",
-    messages
-  }));
+        ws.send(JSON.stringify({
+          type: "history",
+          messages
+        }));
 
-  return;
-}
+        return;
+      }
 
-      if(!currentUser) return;
+      if (!currentUser) return;
 
       // ================= MESSAGE =================
       if (data.type === "message") {
@@ -169,19 +169,19 @@ wss.on("connection", (ws) => {
       }
 
       // ================= BAN =================
-      if(data.type === "ban"){
+      if (data.type === "ban") {
 
-        if(!isUserMod(data.username)) return;
+        if (!isUserMod(data.username)) return;
 
         const target = normalize(data.target);
 
-        if(isUserMod(target)) return;
+        if (isUserMod(target)) return;
 
         bannedUsers.add(target);
         activeUsers.delete(target);
 
         wss.clients.forEach(client => {
-          if(client.username === target){
+          if (client.username === target) {
             client.send(JSON.stringify({ type: "banned" }));
             client.close();
           }
@@ -193,18 +193,18 @@ wss.on("connection", (ws) => {
       }
 
       // ================= UNBAN =================
-if(data.type === "unban"){
+      if (data.type === "unban") {
 
-  if(!isUserMod(data.username)) return;
+        if (!isUserMod(data.username)) return;
 
-  const target = normalize(data.target);
+        const target = normalize(data.target);
 
-  bannedUsers.delete(target);
+        bannedUsers.delete(target);
 
-  broadcastUsers();
+        broadcastUsers();
 
-  sendToDiscord(`🔓 **${data.username}** desbaneó a **${target}**`);
-}
+        sendToDiscord(`🔓 **${data.username}** desbaneó a **${target}**`);
+      }
 
     } catch (e) {
       console.log("error:", e);
@@ -212,7 +212,7 @@ if(data.type === "unban"){
   });
 
   ws.on("close", () => {
-    if(currentUser){
+    if (currentUser) {
       activeUsers.delete(currentUser);
       broadcastUsers();
     }
