@@ -1,4 +1,4 @@
-const WS_URL = "wss://kick-backend-arnu.onrender.com/ws";
+const WS_URL = "wss://extensionkick-production.up.railway.app";
 
 function initChat(){
 

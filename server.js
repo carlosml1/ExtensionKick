@@ -1,71 +1,79 @@
 import express from "express";
-import http from "http";
 import { WebSocketServer } from "ws";
+import http from "http";
 
 const app = express();
-
-// 🔥 ESTE ES EL CAMBIO CLAVE
 const server = http.createServer(app);
 
-const wss = new WebSocketServer({ 
-  server,
-  path: "/ws"   // 🔥 ESTO ES LA CLAVE
-});
+const wss = new WebSocketServer({ server });
 
 let messages = [];
-const mods = ["g466bnrlt"]; // tu ID
+
+// 👉 IDs de mods (pon aquí los tuyos)
+const mods = ["g466bnrlt"];
 
 wss.on("connection", (ws) => {
-  console.log("🟢 cliente conectado");
+  console.log("🟢 usuario conectado");
 
+  // enviar historial
   ws.send(JSON.stringify({
     type: "history",
     messages
   }));
 
-  ws.on("message", (data) => {
-    const msg = JSON.parse(data);
+  ws.on("message", (msg) => {
+    try {
+      const data = JSON.parse(msg);
 
-    if(msg.type === "message"){
-      msg.isMod = mods.includes(msg.userId);
-      messages.push(msg);
+      // ================= MENSAJE =================
+      if (data.type === "message") {
+        const newMsg = {
+          ...data,
+          isMod: mods.includes(data.userId)
+        };
 
-      wss.clients.forEach(client => {
-        if(client.readyState === 1){
-          client.send(JSON.stringify(msg));
-        }
-      });
-    }
+        messages.push(newMsg);
 
-    if(msg.type === "delete"){
-      if(mods.includes(msg.userId)){
-        messages = messages.filter(m => m.id !== msg.messageId);
+        // enviar a todos
+        wss.clients.forEach(client => {
+          if (client.readyState === 1) {
+            client.send(JSON.stringify(newMsg));
+          }
+        });
+      }
+
+      // ================= DELETE =================
+      if (data.type === "delete") {
+        if (!mods.includes(data.userId)) return;
+
+        messages = messages.filter(m => m.id !== data.messageId);
 
         wss.clients.forEach(client => {
-          if(client.readyState === 1){
+          if (client.readyState === 1) {
             client.send(JSON.stringify({
               type: "delete",
-              messageId: msg.messageId
+              messageId: data.messageId
             }));
           }
         });
       }
+
+    } catch (e) {
+      console.log("error:", e);
     }
   });
 
   ws.on("close", () => {
-    console.log("🔴 cliente desconectado");
+    console.log("🔴 usuario desconectado");
   });
 });
 
-// 🔥 NECESARIO PARA RENDER
+// ruta básica (para evitar "Cannot GET /")
 app.get("/", (req, res) => {
-  res.send("OK");
+  res.send("Servidor WebSocket activo 🚀");
 });
 
 const PORT = process.env.PORT || 3000;
-
-// 🔥 ESTO ES CLAVE (NO app.listen)
 server.listen(PORT, () => {
-  console.log("🚀 server activo en " + PORT);
+  console.log("🚀 Server running on port", PORT);
 });
