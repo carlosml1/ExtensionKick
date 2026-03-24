@@ -1,5 +1,10 @@
 const WS_URL = "wss://extensionkick-production.up.railway.app";
 
+// ================= USERS =================
+let usersList = [];
+let modPanelBox = null; // 🔥 referencia modal
+let bannedList = []; // 🔥 NUEVO
+
 // ================= 7TV =================
 let emotes = [];
 
@@ -40,6 +45,12 @@ let isConnected = false;
 ws.onopen = () => {
   console.log("🟢 conectado al servidor");
   isConnected = true;
+
+  // 🔥 REGISTER
+  ws.send(JSON.stringify({
+    type: "register",
+    username
+  }));
 };
 
 ws.onerror = (err) => {
@@ -115,6 +126,17 @@ profileBtn.onclick = () => {
 
 header.appendChild(title);
 header.appendChild(profileBtn);
+
+// 👑 BOTÓN ADMIN
+if(username.toLowerCase() === "caaarlitos10"){
+  const modBtn = document.createElement("span");
+  modBtn.innerText = "🛠";
+  modBtn.style.cursor = "pointer";
+
+  modBtn.onclick = openModPanel;
+
+  header.appendChild(modBtn);
+}
 
 // MENSAJES
 const messagesDiv = document.createElement("div");
@@ -262,26 +284,6 @@ function addMessage(msg){
     div.innerHTML = `${icon}<b>${msg.username}</b>: ${text}`;
   }
 
-  if(msg.image){
-    div.innerHTML = `${icon}<b>${msg.username}</b>:<br>`;
-    const img = document.createElement("img");
-    img.src = msg.image;
-    img.style.borderRadius = "6px";
-    img.style.marginTop = "5px";
-
-    img.onload = () => {
-      if(img.naturalWidth > img.naturalHeight){
-        img.style.width = "150px";
-        img.style.height = "auto";
-      } else {
-        img.style.height = "150px";
-        img.style.width = "auto";
-      }
-    };
-
-    div.appendChild(img);
-  }
-
   const canDelete = isMyUserMod && !msg.isMod;
 
   if(canDelete){
@@ -308,6 +310,25 @@ function addMessage(msg){
 ws.onmessage = (event)=>{
   const data = JSON.parse(event.data);
 
+  if(data.type === "username_taken"){
+    alert("❌ Nombre en uso");
+    localStorage.removeItem("username");
+    location.reload();
+  }
+
+  if(data.type === "banned"){
+    document.body.innerHTML = "<h1 style='color:red'>⛔ BANEADO</h1>";
+  }
+
+  if(data.type === "users"){
+    usersList = data.users;
+    bannedList = data.bannedUsers || []; // 🔥 NUEVO
+
+    if(modPanelBox){
+      renderUsers(modPanelBox);
+    }
+  }
+
   if(data.type === "history"){
     data.messages.forEach(msg => {
       if(msg.username.toLowerCase() === username.toLowerCase()){
@@ -317,10 +338,7 @@ ws.onmessage = (event)=>{
     });
   }
 
-  if(data.type === "message" || data.type === "image"){
-    if(data.username.toLowerCase() === username.toLowerCase()){
-      isMyUserMod = data.isMod === true;
-    }
+  if(data.type === "message"){
     addMessage(data);
   }
 
@@ -329,6 +347,142 @@ ws.onmessage = (event)=>{
     if(el) el.remove();
   }
 };
+
+// ================= MOD PANEL =================
+function openModPanel(){
+
+  const modal = document.createElement("div");
+  modal.style = `
+    position:fixed;
+    top:0;
+    left:0;
+    width:100vw;
+    height:100vh;
+    background:rgba(0,0,0,0.7);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    z-index:9999999;
+  `;
+
+  const box = document.createElement("div");
+  box.style = `
+    background:#111;
+    padding:20px;
+    border-radius:10px;
+    min-width:250px;
+    max-height:80vh;
+    overflow:auto;
+  `;
+
+  modPanelBox = box;
+
+  renderUsers(box);
+
+  modal.appendChild(box);
+
+  modal.onclick = (e) => {
+    if(e.target === modal){
+      modal.remove();
+      modPanelBox = null;
+    }
+  };
+
+  document.body.appendChild(modal);
+}
+
+// ================= RENDER USERS =================
+function renderUsers(box){
+  box.innerHTML = "<h3 style='margin-bottom:10px'>👥 Usuarios</h3>";
+
+  // ACTIVOS
+  usersList.forEach(user => {
+
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.justifyContent = "space-between";
+    row.style.alignItems = "center";
+    row.style.marginBottom = "8px";
+
+    const name = document.createElement("span");
+    name.textContent = user;
+
+    const btn = document.createElement("button");
+
+    btn.textContent = "BAN";
+    btn.style.background = "red";
+
+    btn.onclick = () => {
+      if(user.toLowerCase() === "caaarlitos10") return;
+
+      ws.send(JSON.stringify({
+        type: "ban",
+        username,
+        target: user
+      }));
+
+      row.remove();
+    };
+
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.cursor = "pointer";
+
+    row.appendChild(name);
+    row.appendChild(btn);
+    box.appendChild(row);
+  });
+
+  // 🔥 BANEADOS
+  if(bannedList.length > 0){
+
+    const title = document.createElement("div");
+    title.textContent = "🚫 Baneados";
+    title.style.marginTop = "10px";
+    title.style.opacity = "0.7";
+    box.appendChild(title);
+
+    bannedList.forEach(user => {
+
+      if(usersList.includes(user)) return;
+
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.justifyContent = "space-between";
+      row.style.alignItems = "center";
+      row.style.marginBottom = "8px";
+
+      const name = document.createElement("span");
+      name.textContent = user;
+
+      const btn = document.createElement("button");
+      btn.textContent = "UNBAN";
+      btn.style.background = "green";
+      btn.style.color = "white";
+
+      btn.onclick = () => {
+        ws.send(JSON.stringify({
+          type: "unban",
+          username,
+          target: user
+        }));
+
+        row.remove();
+      };
+
+      row.appendChild(name);
+      row.appendChild(btn);
+      box.appendChild(row);
+    });
+  }
+
+  if(usersList.length === 0 && bannedList.length === 0){
+    const empty = document.createElement("div");
+    empty.textContent = "No hay usuarios...";
+    empty.style.opacity = "0.6";
+    box.appendChild(empty);
+  }
+}
 
 // ================= ENVIAR =================
 function send(){

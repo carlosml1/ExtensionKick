@@ -4,24 +4,26 @@ import http from "http";
 
 const app = express();
 const server = http.createServer(app);
-
 const wss = new WebSocketServer({ server });
 
+// ================= DATA =================
 let messages = [];
+let activeUsers = new Set();
+let bannedUsers = new Set();
 
-// 👉 MODS
 const mods = ["caaarlitos10", "demetriusdementor", "l73ale", "fatinho", "jordantubb"];
 
-// ⚠️ PON TU WEBHOOK NUEVO AQUÍ
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1486031073027686451/Np26uSuAfcFYEzPbiwMKxIoTuw99CqUaHlyK3NQNGjeAokqgrYtgwHdgb5Q48mEUmpFT";
+const DISCORD_WEBHOOK_URL = "TU_WEBHOOK_AQUI";
 
-// comprobar mod
-function isUserMod(username){
-  if(!username) return false;
-  return mods.includes(username.toLowerCase());
+// ================= UTILS =================
+function normalize(name){
+  return name?.trim().toLowerCase();
 }
 
-// 🔥 ENVIAR A DISCORD
+function isUserMod(username){
+  return mods.includes(normalize(username));
+}
+
 async function sendToDiscord(content){
   try {
     await fetch(DISCORD_WEBHOOK_URL, {
@@ -29,27 +31,81 @@ async function sendToDiscord(content){
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content })
     });
-  } catch (err) {
-    console.log("❌ error enviando a Discord");
+  } catch {
+    console.log("❌ error Discord");
   }
 }
 
+function broadcastUsers(){
+  const list = [];
+
+  wss.clients.forEach(client => {
+    if(client.readyState === 1 && client.username){
+      list.push(client.username);
+    }
+  });
+
+  const banned = Array.from(bannedUsers);
+
+  wss.clients.forEach(client => {
+    if(client.readyState === 1){
+      client.send(JSON.stringify({
+        type: "users",
+        users: list,
+        bannedUsers: banned // 🔥 nuevo
+      }));
+    }
+  });
+}
+
+// ================= CONNECTION =================
 wss.on("connection", (ws) => {
   console.log("🟢 usuario conectado");
 
-  // historial
-  ws.send(JSON.stringify({
-    type: "history",
-    messages
-  }));
+  let currentUser = null;
 
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg);
 
-      console.log("📩 tipo:", data.type);
+      // ================= REGISTER =================
+      if(data.type === "register"){
+        const username = normalize(data.username);
 
-      // ================= MENSAJE =================
+        if(bannedUsers.has(username)){
+          ws.send(JSON.stringify({ type: "banned" }));
+          ws.close();
+          return;
+        }
+
+        if(activeUsers.has(username)){
+          ws.send(JSON.stringify({ type: "username_taken" }));
+          return;
+        }
+
+        currentUser = username;
+        ws.username = username;
+
+        activeUsers.add(username);
+
+        ws.send(JSON.stringify({
+          type: "registered",
+          username
+        }));
+
+        broadcastUsers();
+
+        ws.send(JSON.stringify({
+          type: "history",
+          messages
+        }));
+
+        return;
+      }
+
+      if(!currentUser) return;
+
+      // ================= MESSAGE =================
       if (data.type === "message") {
 
         const newMsg = {
@@ -65,17 +121,13 @@ wss.on("connection", (ws) => {
           }
         });
 
-        // 🔥 LOG DISCORD
         sendToDiscord(`💬 **${data.username}**: ${data.text}`);
       }
 
-      // ================= IMAGEN =================
+      // ================= IMAGE =================
       if (data.type === "image") {
 
-        if (!data.image || data.image.length > 1_000_000) {
-          console.log("❌ imagen demasiado grande");
-          return;
-        }
+        if (!data.image || data.image.length > 1_000_000) return;
 
         const newMsg = {
           type: "image",
@@ -93,9 +145,6 @@ wss.on("connection", (ws) => {
           }
         });
 
-        console.log("🖼 imagen enviada");
-
-        // 🔥 LOG DISCORD
         sendToDiscord(`🖼 **${data.username}** envió una imagen`);
       }
 
@@ -107,10 +156,7 @@ wss.on("connection", (ws) => {
         const msg = messages.find(m => m.id === data.messageId);
         if (!msg) return;
 
-        const targetIsMod = isUserMod(msg.username);
-
-        // mod no borra mod
-        if (targetIsMod) return;
+        if (isUserMod(msg.username)) return;
 
         messages = messages.filter(m => m.id !== data.messageId);
 
@@ -123,11 +169,46 @@ wss.on("connection", (ws) => {
           }
         });
 
-        console.log("🗑 mensaje eliminado");
-
-        // 🔥 LOG DISCORD
         sendToDiscord(`🗑 **${data.username}** borró un mensaje`);
       }
+
+      // ================= BAN =================
+      if(data.type === "ban"){
+
+        if(!isUserMod(data.username)) return;
+
+        const target = normalize(data.target);
+
+        if(isUserMod(target)) return;
+
+        bannedUsers.add(target);
+        activeUsers.delete(target);
+
+        wss.clients.forEach(client => {
+          if(client.username === target){
+            client.send(JSON.stringify({ type: "banned" }));
+            client.close();
+          }
+        });
+
+        broadcastUsers();
+
+        sendToDiscord(`🔨 **${data.username}** baneó a **${target}**`);
+      }
+
+      // ================= UNBAN =================
+if(data.type === "unban"){
+
+  if(!isUserMod(data.username)) return;
+
+  const target = normalize(data.target);
+
+  bannedUsers.delete(target);
+
+  broadcastUsers();
+
+  sendToDiscord(`🔓 **${data.username}** desbaneó a **${target}**`);
+}
 
     } catch (e) {
       console.log("error:", e);
@@ -135,11 +216,15 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    if(currentUser){
+      activeUsers.delete(currentUser);
+      broadcastUsers();
+    }
     console.log("🔴 usuario desconectado");
   });
 });
 
-// ruta base
+// ================= HTTP =================
 app.get("/", (req, res) => {
   res.send("Servidor WebSocket activo 🚀");
 });
