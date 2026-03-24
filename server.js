@@ -12,7 +12,7 @@ let messages = [];
 // 👉 MODS (en minúsculas SIEMPRE)
 const mods = ["caaarlitos10"];
 
-// función para comprobar mod (ignora mayúsculas)
+// función para comprobar mod
 function isUserMod(username){
   if(!username) return false;
   return mods.includes(username.toLowerCase());
@@ -31,6 +31,8 @@ wss.on("connection", (ws) => {
     try {
       const data = JSON.parse(msg);
 
+      console.log("📩 tipo:", data.type); // DEBUG
+
       // ================= MENSAJE =================
       if (data.type === "message") {
 
@@ -41,7 +43,6 @@ wss.on("connection", (ws) => {
 
         messages.push(newMsg);
 
-        // enviar a todos
         wss.clients.forEach(client => {
           if (client.readyState === 1) {
             client.send(JSON.stringify(newMsg));
@@ -49,10 +50,46 @@ wss.on("connection", (ws) => {
         });
       }
 
+      // ================= 🖼 IMAGEN =================
+      if (data.type === "image") {
+
+        // 🔒 limitar tamaño (~1MB)
+        if (!data.image || data.image.length > 1_000_000) {
+          console.log("❌ imagen demasiado grande");
+          return;
+        }
+
+        const newMsg = {
+          type: "image",
+          id: data.id,
+          username: data.username,
+          image: data.image,
+          isMod: isUserMod(data.username)
+        };
+
+        messages.push(newMsg);
+
+        wss.clients.forEach(client => {
+          if (client.readyState === 1) {
+            client.send(JSON.stringify(newMsg));
+          }
+        });
+
+        console.log("🖼 imagen enviada");
+      }
+
       // ================= DELETE =================
       if (data.type === "delete") {
 
         if (!isUserMod(data.username)) return;
+
+        const msg = messages.find(m => m.id === data.messageId);
+        if (!msg) return;
+
+        const targetIsMod = isUserMod(msg.username);
+
+        // 🔥 MOD NO BORRA MOD
+        if (targetIsMod) return;
 
         messages = messages.filter(m => m.id !== data.messageId);
 
@@ -64,6 +101,8 @@ wss.on("connection", (ws) => {
             }));
           }
         });
+
+        console.log("🗑 mensaje eliminado");
       }
 
     } catch (e) {

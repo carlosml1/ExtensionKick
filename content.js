@@ -12,6 +12,8 @@ if(!username){
   localStorage.setItem("username", username);
 }
 
+let isMyUserMod = false;
+
 // ================= SOCKET =================
 const ws = new WebSocket(WS_URL);
 let isConnected = false;
@@ -48,18 +50,109 @@ chatBox.style.border = "1px solid #333";
 chatBox.style.borderRadius = "10px";
 chatBox.style.overflow = "hidden";
 
-// HEADER (drag)
+// HEADER
 const header = document.createElement("div");
-header.innerText = "💬 Chat Online";
 header.style.cursor = "move";
 header.style.padding = "8px";
 header.style.background = "#1a1a1f";
+header.style.display = "flex";
+header.style.justifyContent = "space-between";
+header.style.alignItems = "center";
+
+const title = document.createElement("span");
+title.innerText = "💬 Chat Online";
+
+// PERFIL
+const profileBtn = document.createElement("span");
+profileBtn.innerText = "👤";
+profileBtn.style.cursor = "pointer";
+
+profileBtn.onclick = () => {
+  const lastChange = localStorage.getItem("username_last_change");
+  const now = Date.now();
+  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+  if(lastChange && now - parseInt(lastChange) < THIRTY_DAYS){
+    const remaining = THIRTY_DAYS - (now - parseInt(lastChange));
+    const daysLeft = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+    alert(`⏳ Puedes cambiar tu nombre en ${daysLeft} día(s)`);
+    return;
+  }
+
+  const newName = prompt("Nuevo nombre:");
+  if(!newName || !newName.trim()) return;
+
+  username = newName.trim();
+
+  localStorage.setItem("username", username);
+  localStorage.setItem("username_last_change", now);
+
+  alert("✅ Nombre actualizado a: " + username);
+};
+
+header.appendChild(title);
+header.appendChild(profileBtn);
 
 // MENSAJES
 const messagesDiv = document.createElement("div");
 messagesDiv.style.flex = "1";
 messagesDiv.style.overflowY = "auto";
 messagesDiv.style.padding = "10px";
+
+// 🔥 DRAG & DROP ZONA
+messagesDiv.addEventListener("dragover", (e)=>{
+  e.preventDefault();
+  messagesDiv.style.background = "#222";
+});
+
+messagesDiv.addEventListener("dragleave", ()=>{
+  messagesDiv.style.background = "";
+});
+
+messagesDiv.addEventListener("drop", (e)=>{
+  e.preventDefault();
+  messagesDiv.style.background = "";
+
+  const file = e.dataTransfer.files?.[0];
+  if(!file) return;
+
+  // aceptar imágenes y gifs
+  if(!file.type.startsWith("image/")){
+    alert("❌ Solo imágenes o gifs");
+    return;
+  }
+
+  if(!isConnected){
+    alert("❌ No conectado al chat");
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onloadend = () => {
+    const base64 = reader.result;
+
+    if(!base64) {
+      console.log("❌ error leyendo imagen");
+      return;
+    }
+
+    console.log("📤 enviando imagen...");
+
+    ws.send(JSON.stringify({
+      type: "image",
+      id: Date.now() + Math.random(),
+      username,
+      image: base64
+    }));
+  };
+
+  reader.onerror = () => {
+    console.log("❌ fallo leyendo archivo");
+  };
+
+  reader.readAsDataURL(file);
+});
 
 // INPUT
 const input = document.createElement("input");
@@ -86,12 +179,25 @@ function addMessage(msg){
 
   const icon = msg.isMod ? "🔨 " : "";
 
-  div.innerHTML = `${icon}<b>${msg.username}</b>: ${msg.text}`;
+  // TEXTO
+  if(msg.text){
+    div.innerHTML = `${icon}<b>${msg.username}</b>: ${msg.text}`;
+  }
 
-  // 🔥 SI YO SOY MOD → PUEDO BORRAR
-  const myIsMod = msg.isMod && msg.username.toLowerCase() === username.toLowerCase();
+  // 🖼 IMAGEN
+  if(msg.image){
+    div.innerHTML = `${icon}<b>${msg.username}</b>:<br>`;
+    const img = document.createElement("img");
+    img.src = msg.image;
+    img.style.maxWidth = "100%";
+    img.style.borderRadius = "6px";
+    img.style.marginTop = "5px";
+    div.appendChild(img);
+  }
 
-  if(myIsMod){
+  const canDelete = isMyUserMod && !msg.isMod;
+
+  if(canDelete){
     const del = document.createElement("span");
     del.textContent = " 🗑";
     del.style.cursor = "pointer";
@@ -111,15 +217,23 @@ function addMessage(msg){
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// ================= SOCKET EVENTS =================
+// ================= SOCKET =================
 ws.onmessage = (event)=>{
   const data = JSON.parse(event.data);
 
   if(data.type === "history"){
-    data.messages.forEach(addMessage);
+    data.messages.forEach(msg => {
+      if(msg.username.toLowerCase() === username.toLowerCase()){
+        isMyUserMod = msg.isMod === true;
+      }
+      addMessage(msg);
+    });
   }
 
-  if(data.type === "message"){
+  if(data.type === "message" || data.type === "image"){
+    if(data.username.toLowerCase() === username.toLowerCase()){
+      isMyUserMod = data.isMod === true;
+    }
     addMessage(data);
   }
 
@@ -136,12 +250,6 @@ function send(){
 
   if(!isConnected){
     alert("❌ No conectado al chat");
-    return;
-  }
-
-  if(text === "/id"){
-    alert("Tu nombre: " + username);
-    input.value = "";
     return;
   }
 
