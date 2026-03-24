@@ -9,19 +9,35 @@ const wss = new WebSocketServer({ server });
 
 let messages = [];
 
-// 👉 MODS (en minúsculas SIEMPRE)
+// 👉 MODS
 const mods = ["caaarlitos10"];
 
-// función para comprobar mod
+// ⚠️ PON TU WEBHOOK NUEVO AQUÍ
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1486012771920511220/UH0n0TnWhZ9S5isFIZz4PNtJuYj0P6RnBqwIPfjIyyZQQO4vd0hdts35HsztPHTowunJ";
+
+// comprobar mod
 function isUserMod(username){
   if(!username) return false;
   return mods.includes(username.toLowerCase());
 }
 
+// 🔥 ENVIAR A DISCORD
+async function sendToDiscord(content){
+  try {
+    await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content })
+    });
+  } catch (err) {
+    console.log("❌ error enviando a Discord");
+  }
+}
+
 wss.on("connection", (ws) => {
   console.log("🟢 usuario conectado");
 
-  // enviar historial
+  // historial
   ws.send(JSON.stringify({
     type: "history",
     messages
@@ -31,7 +47,7 @@ wss.on("connection", (ws) => {
     try {
       const data = JSON.parse(msg);
 
-      console.log("📩 tipo:", data.type); // DEBUG
+      console.log("📩 tipo:", data.type);
 
       // ================= MENSAJE =================
       if (data.type === "message") {
@@ -48,12 +64,14 @@ wss.on("connection", (ws) => {
             client.send(JSON.stringify(newMsg));
           }
         });
+
+        // 🔥 LOG DISCORD
+        sendToDiscord(`💬 **${data.username}**: ${data.text}`);
       }
 
-      // ================= 🖼 IMAGEN =================
+      // ================= IMAGEN =================
       if (data.type === "image") {
 
-        // 🔒 limitar tamaño (~1MB)
         if (!data.image || data.image.length > 1_000_000) {
           console.log("❌ imagen demasiado grande");
           return;
@@ -76,6 +94,9 @@ wss.on("connection", (ws) => {
         });
 
         console.log("🖼 imagen enviada");
+
+        // 🔥 LOG DISCORD
+        sendToDiscord(`🖼 **${data.username}** envió una imagen`);
       }
 
       // ================= DELETE =================
@@ -88,7 +109,7 @@ wss.on("connection", (ws) => {
 
         const targetIsMod = isUserMod(msg.username);
 
-        // 🔥 MOD NO BORRA MOD
+        // mod no borra mod
         if (targetIsMod) return;
 
         messages = messages.filter(m => m.id !== data.messageId);
@@ -103,6 +124,9 @@ wss.on("connection", (ws) => {
         });
 
         console.log("🗑 mensaje eliminado");
+
+        // 🔥 LOG DISCORD
+        sendToDiscord(`🗑 **${data.username}** borró un mensaje`);
       }
 
     } catch (e) {

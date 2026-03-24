@@ -48,7 +48,17 @@ chatBox.style.display = "flex";
 chatBox.style.flexDirection = "column";
 chatBox.style.border = "1px solid #333";
 chatBox.style.borderRadius = "10px";
-chatBox.style.overflow = "hidden";
+
+// 🔥 CAMBIOS IMPORTANTES
+chatBox.style.resize = "both";
+chatBox.style.overflow = "auto";
+chatBox.style.minWidth = "250px";
+chatBox.style.minHeight = "300px";
+chatBox.style.maxWidth = "90vw";
+chatBox.style.maxHeight = "90vh";
+
+// opcional (se ve mejor)
+chatBox.style.boxShadow = "0 0 15px rgba(0,0,0,0.5)";
 
 // HEADER
 const header = document.createElement("div");
@@ -99,7 +109,7 @@ messagesDiv.style.flex = "1";
 messagesDiv.style.overflowY = "auto";
 messagesDiv.style.padding = "10px";
 
-// 🔥 DRAG & DROP ZONA
+// 🔥 DRAG & DROP (ARREGLADO)
 messagesDiv.addEventListener("dragover", (e)=>{
   e.preventDefault();
   messagesDiv.style.background = "#222";
@@ -116,7 +126,6 @@ messagesDiv.addEventListener("drop", (e)=>{
   const file = e.dataTransfer.files?.[0];
   if(!file) return;
 
-  // aceptar imágenes y gifs
   if(!file.type.startsWith("image/")){
     alert("❌ Solo imágenes o gifs");
     return;
@@ -127,28 +136,42 @@ messagesDiv.addEventListener("drop", (e)=>{
     return;
   }
 
+  const img = new Image();
   const reader = new FileReader();
 
-  reader.onloadend = () => {
-    const base64 = reader.result;
+  reader.onload = () => {
+    img.src = reader.result;
+  };
 
-    if(!base64) {
-      console.log("❌ error leyendo imagen");
-      return;
-    }
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
 
-    console.log("📤 enviando imagen...");
+    const maxWidth = 400;
+    const scale = maxWidth / img.width;
+
+    canvas.width = maxWidth;
+    canvas.height = img.height * scale;
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const compressed = canvas.toDataURL("image/jpeg", 0.7);
+
+    console.log("📉 tamaño original:", file.size);
+    console.log("📉 tamaño comprimido:", compressed.length);
 
     ws.send(JSON.stringify({
       type: "image",
       id: Date.now() + Math.random(),
       username,
-      image: base64
+      image: compressed
     }));
+
+    console.log("📤 imagen enviada (comprimida)");
   };
 
   reader.onerror = () => {
-    console.log("❌ fallo leyendo archivo");
+    console.log("❌ error leyendo archivo");
   };
 
   reader.readAsDataURL(file);
@@ -179,21 +202,33 @@ function addMessage(msg){
 
   const icon = msg.isMod ? "🔨 " : "";
 
-  // TEXTO
   if(msg.text){
     div.innerHTML = `${icon}<b>${msg.username}</b>: ${msg.text}`;
   }
 
-  // 🖼 IMAGEN
   if(msg.image){
-    div.innerHTML = `${icon}<b>${msg.username}</b>:<br>`;
-    const img = document.createElement("img");
-    img.src = msg.image;
-    img.style.maxWidth = "100%";
-    img.style.borderRadius = "6px";
-    img.style.marginTop = "5px";
-    div.appendChild(img);
-  }
+  div.innerHTML = `${icon}<b>${msg.username}</b>:<br>`;
+  const img = document.createElement("img");
+  img.src = msg.image;
+
+  img.style.borderRadius = "6px";
+  img.style.marginTop = "5px";
+
+  // 🔥 mantener proporción SIN recortar
+  img.onload = () => {
+    if(img.naturalWidth > img.naturalHeight){
+      // horizontal → ancho máx 150
+      img.style.width = "150px";
+      img.style.height = "auto";
+    } else {
+      // vertical → alto máx 150
+      img.style.height = "150px";
+      img.style.width = "auto";
+    }
+  };
+
+  div.appendChild(img);
+}
 
   const canDelete = isMyUserMod && !msg.isMod;
 
