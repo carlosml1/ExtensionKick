@@ -10,7 +10,7 @@ const wss = new WebSocketServer({ server });
 let messages = [];
 
 // 👉 MODS
-const mods = ["caaarlitos10", "demetriusdementor", "L73ale", "Fatinho", "Jordantubb"];
+const mods = ["caaarlitos10", "demetriusdementor", "l73ale", "fatinho", "jordantubb"];
 
 // ⚠️ PON TU WEBHOOK NUEVO AQUÍ
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1486031073027686451/Np26uSuAfcFYEzPbiwMKxIoTuw99CqUaHlyK3NQNGjeAokqgrYtgwHdgb5Q48mEUmpFT";
