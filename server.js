@@ -10,7 +10,7 @@ const wss = new WebSocketServer({ server });
 let messages = [];
 
 // 👉 IDs de mods (pon aquí los tuyos)
-const mods = ["g466bnrlt"];
+const mods = ["Caaarlitos10"];
 
 wss.on("connection", (ws) => {
   console.log("🟢 usuario conectado");
