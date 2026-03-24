@@ -9,8 +9,14 @@ const wss = new WebSocketServer({ server });
 
 let messages = [];
 
-// 👉 IDs de mods (pon aquí los tuyos)
-const mods = ["Caaarlitos10"];
+// 👉 MODS (en minúsculas SIEMPRE)
+const mods = ["caaarlitos10"];
+
+// función para comprobar mod (ignora mayúsculas)
+function isUserMod(username){
+  if(!username) return false;
+  return mods.includes(username.toLowerCase());
+}
 
 wss.on("connection", (ws) => {
   console.log("🟢 usuario conectado");
@@ -27,9 +33,10 @@ wss.on("connection", (ws) => {
 
       // ================= MENSAJE =================
       if (data.type === "message") {
+
         const newMsg = {
           ...data,
-          isMod: mods.includes(data.userId)
+          isMod: isUserMod(data.username)
         };
 
         messages.push(newMsg);
@@ -44,7 +51,8 @@ wss.on("connection", (ws) => {
 
       // ================= DELETE =================
       if (data.type === "delete") {
-        if (!mods.includes(data.userId)) return;
+
+        if (!isUserMod(data.username)) return;
 
         messages = messages.filter(m => m.id !== data.messageId);
 
@@ -68,7 +76,7 @@ wss.on("connection", (ws) => {
   });
 });
 
-// ruta básica (para evitar "Cannot GET /")
+// ruta base
 app.get("/", (req, res) => {
   res.send("Servidor WebSocket activo 🚀");
 });

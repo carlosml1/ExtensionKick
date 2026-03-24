@@ -5,12 +5,6 @@ function initChat(){
 if(document.getElementById("mi-chat-overlay")) return;
 
 // ================= USER =================
-let userId = localStorage.getItem("userId");
-if(!userId){
-  userId = Math.random().toString(36).substring(2,10);
-  localStorage.setItem("userId", userId);
-}
-
 let username = localStorage.getItem("username");
 
 if(!username){
@@ -94,7 +88,7 @@ function addMessage(msg){
 
   div.innerHTML = `${icon}<b>${msg.username}</b>: ${msg.text}`;
 
-  // 🔥 BOTÓN BORRAR (SOLO SI TÚ ERES MOD)
+  // 🔥 SI YO SOY MOD → PUEDO BORRAR
   const myIsMod = msg.isMod && msg.username.toLowerCase() === username.toLowerCase();
 
   if(myIsMod){
@@ -106,7 +100,7 @@ function addMessage(msg){
       ws.send(JSON.stringify({
         type: "delete",
         messageId: msg.id,
-        username // 🔥 IMPORTANTE (ya no usamos userId)
+        username
       }));
     };
 
@@ -146,7 +140,7 @@ function send(){
   }
 
   if(text === "/id"){
-    alert("Tu ID: " + userId);
+    alert("Tu nombre: " + username);
     input.value = "";
     return;
   }
@@ -155,8 +149,7 @@ function send(){
     type: "message",
     id: Date.now() + Math.random(),
     username,
-    text,
-    userId
+    text
   };
 
   ws.send(JSON.stringify(msg));
