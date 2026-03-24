@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Kick Custom Chat",
+  "version": "1.0",
+  "description": "Añade chat personalizado a Kick",
+  "content_scripts": [
+    {
+      "matches": ["https://kick.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
