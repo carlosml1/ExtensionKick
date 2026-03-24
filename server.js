@@ -8,7 +8,6 @@ const wss = new WebSocketServer({ server });
 
 // ================= DATA =================
 let messages = [];
-let activeUsers = new Set();
 let bannedUsers = new Set();
 
 const mods = ["caaarlitos10", "demetriusdementor", "l73ale", "fatinho", "jordantubb"];
@@ -37,11 +36,11 @@ async function sendToDiscord(content){
 }
 
 function broadcastUsers(){
-  const list = [];
+  const users = [];
 
   wss.clients.forEach(client => {
     if(client.readyState === 1 && client.username){
-      list.push(client.username);
+      users.push(client.username);
     }
   });
 
@@ -51,11 +50,12 @@ function broadcastUsers(){
     if(client.readyState === 1){
       client.send(JSON.stringify({
         type: "users",
-        users: list,
-        bannedUsers: banned // 🔥 nuevo
+        users,
+        bannedUsers: banned
       }));
     }
   });
+  console.log("👥 usuarios conectados:", users);
 }
 
 // ================= CONNECTION =================
@@ -70,38 +70,34 @@ wss.on("connection", (ws) => {
 
       // ================= REGISTER =================
       if(data.type === "register"){
-        const username = normalize(data.username);
+  const username = normalize(data.username);
 
-        if(bannedUsers.has(username)){
-          ws.send(JSON.stringify({ type: "banned" }));
-          ws.close();
-          return;
-        }
+  if(bannedUsers.has(username)){
+    ws.send(JSON.stringify({ type: "banned" }));
+    ws.close();
+    return;
+  }
 
-        if(activeUsers.has(username)){
-          ws.send(JSON.stringify({ type: "username_taken" }));
-          return;
-        }
+  // 🔥 IMPORTANTE
+  ws.username = username; // ← ESTA LÍNEA ES CLAVE
 
-        currentUser = username;
-        ws.username = username;
+  currentUser = username;
 
-        activeUsers.add(username);
+  ws.send(JSON.stringify({
+    type: "registered",
+    username
+  }));
 
-        ws.send(JSON.stringify({
-          type: "registered",
-          username
-        }));
+  // 🔥 MUY IMPORTANTE (después de asignar username)
+  broadcastUsers();
 
-        broadcastUsers();
+  ws.send(JSON.stringify({
+    type: "history",
+    messages
+  }));
 
-        ws.send(JSON.stringify({
-          type: "history",
-          messages
-        }));
-
-        return;
-      }
+  return;
+}
 
       if(!currentUser) return;
 
