@@ -10,10 +10,10 @@ const wss = new WebSocketServer({ server });
 let messages = [];
 
 // 👉 MODS
-const mods = ["caaarlitos10"];
+const mods = ["caaarlitos10", "demetriusdementor", "L73ale", "Fatinho", "Jordantubb"];
 
 // ⚠️ PON TU WEBHOOK NUEVO AQUÍ
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1486012771920511220/UH0n0TnWhZ9S5isFIZz4PNtJuYj0P6RnBqwIPfjIyyZQQO4vd0hdts35HsztPHTowunJ";
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1486031073027686451/Np26uSuAfcFYEzPbiwMKxIoTuw99CqUaHlyK3NQNGjeAokqgrYtgwHdgb5Q48mEUmpFT";
 
 // comprobar mod
 function isUserMod(username){

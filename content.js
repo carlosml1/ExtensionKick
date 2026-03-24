@@ -1,5 +1,24 @@
 const WS_URL = "wss://extensionkick-production.up.railway.app";
 
+// ================= 7TV =================
+let emotes = [];
+
+async function load7TVEmotes(){
+  try {
+    const res = await fetch("https://7tv.io/v3/emote-sets/01FCKRX4D0000FA9SJTT9E2MC3");
+    const data = await res.json();
+
+    emotes = data.emotes.map(e => ({
+      name: e.name,
+      url: `https://cdn.7tv.app/emote/${e.id}/2x.webp`
+    }));
+
+    console.log("✅ emotes cargados:", emotes.length);
+  } catch(e){
+    console.log("❌ error cargando 7tv");
+  }
+}
+
 function initChat(){
 
 if(document.getElementById("mi-chat-overlay")) return;
@@ -48,17 +67,12 @@ chatBox.style.display = "flex";
 chatBox.style.flexDirection = "column";
 chatBox.style.border = "1px solid #333";
 chatBox.style.borderRadius = "10px";
-
-// 🔥 CAMBIOS IMPORTANTES
 chatBox.style.resize = "both";
 chatBox.style.overflow = "auto";
 chatBox.style.minWidth = "250px";
 chatBox.style.minHeight = "300px";
 chatBox.style.maxWidth = "90vw";
 chatBox.style.maxHeight = "90vh";
-
-// opcional (se ve mejor)
-chatBox.style.boxShadow = "0 0 15px rgba(0,0,0,0.5)";
 
 // HEADER
 const header = document.createElement("div");
@@ -93,7 +107,6 @@ profileBtn.onclick = () => {
   if(!newName || !newName.trim()) return;
 
   username = newName.trim();
-
   localStorage.setItem("username", username);
   localStorage.setItem("username_last_change", now);
 
@@ -108,74 +121,6 @@ const messagesDiv = document.createElement("div");
 messagesDiv.style.flex = "1";
 messagesDiv.style.overflowY = "auto";
 messagesDiv.style.padding = "10px";
-
-// 🔥 DRAG & DROP (ARREGLADO)
-messagesDiv.addEventListener("dragover", (e)=>{
-  e.preventDefault();
-  messagesDiv.style.background = "#222";
-});
-
-messagesDiv.addEventListener("dragleave", ()=>{
-  messagesDiv.style.background = "";
-});
-
-messagesDiv.addEventListener("drop", (e)=>{
-  e.preventDefault();
-  messagesDiv.style.background = "";
-
-  const file = e.dataTransfer.files?.[0];
-  if(!file) return;
-
-  if(!file.type.startsWith("image/")){
-    alert("❌ Solo imágenes o gifs");
-    return;
-  }
-
-  if(!isConnected){
-    alert("❌ No conectado al chat");
-    return;
-  }
-
-  const img = new Image();
-  const reader = new FileReader();
-
-  reader.onload = () => {
-    img.src = reader.result;
-  };
-
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-
-    const maxWidth = 400;
-    const scale = maxWidth / img.width;
-
-    canvas.width = maxWidth;
-    canvas.height = img.height * scale;
-
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    const compressed = canvas.toDataURL("image/jpeg", 0.7);
-
-    console.log("📉 tamaño original:", file.size);
-    console.log("📉 tamaño comprimido:", compressed.length);
-
-    ws.send(JSON.stringify({
-      type: "image",
-      id: Date.now() + Math.random(),
-      username,
-      image: compressed
-    }));
-
-    console.log("📤 imagen enviada (comprimida)");
-  };
-
-  reader.onerror = () => {
-    console.log("❌ error leyendo archivo");
-  };
-
-  reader.readAsDataURL(file);
-});
 
 // INPUT
 const input = document.createElement("input");
@@ -195,6 +140,110 @@ btn.style.border = "none";
 btn.style.cursor = "pointer";
 btn.style.padding = "8px";
 
+// ================= EMOTE BOX =================
+const emoteBox = document.createElement("div");
+
+emoteBox.style.position = "absolute";
+emoteBox.style.bottom = "60px";
+emoteBox.style.left = "10px";
+emoteBox.style.background = "#1a1a1f";
+emoteBox.style.border = "1px solid #333";
+emoteBox.style.borderRadius = "8px";
+emoteBox.style.padding = "5px";
+emoteBox.style.display = "none";
+emoteBox.style.maxHeight = "150px";
+emoteBox.style.overflowY = "auto";
+
+chatBox.appendChild(emoteBox);
+
+let selectedIndex = 0;
+let filtered = [];
+
+// ================= INPUT EVENT =================
+input.addEventListener("input", () => {
+  const text = input.value.split(" ").pop().toLowerCase();
+
+  if(!text){
+    emoteBox.style.display = "none";
+    return;
+  }
+
+  filtered = emotes
+    .filter(e => e.name.toLowerCase().startsWith(text))
+    .slice(0, 20);
+
+  if(filtered.length === 0){
+    emoteBox.style.display = "none";
+    return;
+  }
+
+  renderEmoteBox();
+});
+
+function renderEmoteBox(){
+  emoteBox.innerHTML = "";
+
+  filtered.forEach((e, i) => {
+    const item = document.createElement("div");
+    item.style.display = "flex";
+    item.style.alignItems = "center";
+    item.style.padding = "4px";
+    item.style.cursor = "pointer";
+
+    if(i === selectedIndex){
+      item.style.background = "#333";
+    }
+
+    const img = document.createElement("img");
+    img.src = e.url;
+    img.style.width = "24px";
+    img.style.marginRight = "6px";
+
+    const name = document.createElement("span");
+    name.textContent = e.name;
+
+    item.appendChild(img);
+    item.appendChild(name);
+
+    item.onclick = () => selectEmote(i);
+
+    emoteBox.appendChild(item);
+  });
+
+  emoteBox.style.display = "block";
+}
+
+function selectEmote(index){
+  const parts = input.value.split(" ");
+  parts.pop();
+  parts.push(filtered[index].name);
+
+  input.value = parts.join(" ") + " ";
+  emoteBox.style.display = "none";
+}
+
+input.addEventListener("keydown", (e) => {
+
+  if(e.key === "Tab" && emoteBox.style.display === "block"){
+    e.preventDefault();
+    selectEmote(selectedIndex);
+  }
+
+  if(e.key === "ArrowDown"){
+    selectedIndex = (selectedIndex + 1) % filtered.length;
+    renderEmoteBox();
+  }
+
+  if(e.key === "ArrowUp"){
+    selectedIndex = (selectedIndex - 1 + filtered.length) % filtered.length;
+    renderEmoteBox();
+  }
+
+  if(e.key === "Backspace" && input.value.length <= 1){
+    emoteBox.style.display = "none";
+  }
+});
+
 // ================= MENSAJES =================
 function addMessage(msg){
   const div = document.createElement("div");
@@ -203,32 +252,35 @@ function addMessage(msg){
   const icon = msg.isMod ? "🔨 " : "";
 
   if(msg.text){
-    div.innerHTML = `${icon}<b>${msg.username}</b>: ${msg.text}`;
+    let text = msg.text;
+
+    emotes.forEach(e => {
+      const regex = new RegExp(`\\b${e.name}\\b`, "g");
+      text = text.replace(regex, `<img src="${e.url}" style="width:24px;vertical-align:middle;">`);
+    });
+
+    div.innerHTML = `${icon}<b>${msg.username}</b>: ${text}`;
   }
 
   if(msg.image){
-  div.innerHTML = `${icon}<b>${msg.username}</b>:<br>`;
-  const img = document.createElement("img");
-  img.src = msg.image;
+    div.innerHTML = `${icon}<b>${msg.username}</b>:<br>`;
+    const img = document.createElement("img");
+    img.src = msg.image;
+    img.style.borderRadius = "6px";
+    img.style.marginTop = "5px";
 
-  img.style.borderRadius = "6px";
-  img.style.marginTop = "5px";
+    img.onload = () => {
+      if(img.naturalWidth > img.naturalHeight){
+        img.style.width = "150px";
+        img.style.height = "auto";
+      } else {
+        img.style.height = "150px";
+        img.style.width = "auto";
+      }
+    };
 
-  // 🔥 mantener proporción SIN recortar
-  img.onload = () => {
-    if(img.naturalWidth > img.naturalHeight){
-      // horizontal → ancho máx 150
-      img.style.width = "150px";
-      img.style.height = "auto";
-    } else {
-      // vertical → alto máx 150
-      img.style.height = "150px";
-      img.style.width = "auto";
-    }
-  };
-
-  div.appendChild(img);
-}
+    div.appendChild(img);
+  }
 
   const canDelete = isMyUserMod && !msg.isMod;
 
@@ -329,6 +381,9 @@ chatBox.appendChild(input);
 chatBox.appendChild(btn);
 
 document.body.appendChild(chatBox);
+
+// 🔥 cargar emotes
+load7TVEmotes();
 
 console.log("🔥 Chat online listo");
 }
