@@ -178,7 +178,6 @@ wss.on("connection", (ws) => {
         if (isUserMod(target)) return;
 
         bannedUsers.add(target);
-        activeUsers.delete(target);
 
         wss.clients.forEach(client => {
           if (client.username === target) {
@@ -213,7 +212,6 @@ wss.on("connection", (ws) => {
 
   ws.on("close", () => {
     if (currentUser) {
-      activeUsers.delete(currentUser);
       broadcastUsers();
     }
     console.log("🔴 usuario desconectado");
